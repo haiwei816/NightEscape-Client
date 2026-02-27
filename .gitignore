@@ -1,0 +1,57 @@
+# Unity 核心忽略文件
+/[Ll]ibrary/
+/[Tt]emp/
+/[Oo]bj/
+/[Bb]uild/
+/[Bb]uilds/
+/[Ll]ogs/
+/[Uu]ser[Ss]ettings/
+
+# 捕获通配符大小写问题
+/[Mm]emoryCaptures/
+/[Vv]endor/
+
+# Unity 包管理器
+/Packages/*
+!Packages/manifest.json
+!Packages/packages-lock.json
+
+# Unity 证书文件
+*.apk
+*.unitypackage
+*.app
+*.exe
+*.dll
+*.so
+*.dylib
+*.pdb
+*.mdb
+*.zip
+*.7z
+
+# 编辑器配置（个人设置，不上传）
+/[Ee]xported[Oo]bj/
+/[Dd]ebug/
+/[Rr]elease/
+/[Bb]uild[Ll]ogs/
+/[Uu]nity[Cc]ache/
+/[Pp]roject[Dd]ata/
+/[Mm]etadata/
+/[Bb]ackups/
+/[Ll]ocal[Cc]ache/
+
+# 操作系统文件
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Visual Studio 缓存/配置文件
+.vs/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
