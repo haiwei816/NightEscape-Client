@@ -132,4 +132,9 @@ public class TcpClientManager : MonoBehaviour
             Debug.LogError("[TCP] ∑¢ÀÕ“Ï≥£: " + e.Message);
         }
     }
+
+    public bool IsConnected
+    {
+        get { return _client != null && _client.Connected; }
+    }
 }
