@@ -2,11 +2,20 @@ using UnityEngine;
 using System;
 using System.Net.Sockets;
 using System.Collections.Generic;
+using Youdu;
 
 public class TcpClientManager : MonoBehaviour
 {
     // --- 第一部分：基础定义与单例 ---
     public static TcpClientManager Instance;
+
+    // 服务器广播玩家移动时的回调
+    public Action<S2C_MoveBroadcast> OnMoveBroadcastReceived;
+    // 登录结果回调
+    public Action<S2C_LoginResult> OnLoginResultReceived;
+
+    // 本机在服务器上的实体 ID
+    public int LocalEntityId { get; private set; }
     private TcpClient _client;
     private NetworkStream _stream;
     private byte[] _readBuffer = new byte[8192];
@@ -77,9 +86,6 @@ public class TcpClientManager : MonoBehaviour
     // --- 第三部分：解包与发送 ---
     private void ProcessBuffer(byte[] temp)
     {
-        // 暴力调试：不管三七二十一，先打印原始收到的字节数
-        Debug.Log($"<color=white>[网络调试] 收到原始数据，长度: {temp.Length}</color>");
-
         lock (_cacheBuffer)
         {
             _cacheBuffer.AddRange(temp);
@@ -87,9 +93,6 @@ public class TcpClientManager : MonoBehaviour
             while (_cacheBuffer.Count >= 2)
             {
                 byte[] lenBytes = _cacheBuffer.GetRange(0, 2).ToArray();
-
-                // 看看这前两个字节到底是什么
-                // Debug.Log($"[网络调试] 长度头字节: {lenBytes[0]} , {lenBytes[1]}");
 
                 if (BitConverter.IsLittleEndian) Array.Reverse(lenBytes);
                 ushort bodyLen = BitConverter.ToUInt16(lenBytes, 0);
@@ -99,8 +102,40 @@ public class TcpClientManager : MonoBehaviour
                     byte[] body = _cacheBuffer.GetRange(2, bodyLen).ToArray();
                     _cacheBuffer.RemoveRange(0, 2 + bodyLen);
 
-                    string msg = System.Text.Encoding.UTF8.GetString(body);
-                    Debug.Log($"<color=green>【恭喜】解包成功: {msg}</color>");
+                    if (body.Length < 1)
+                    {
+                        Debug.LogWarning("[TCP] 收到空包体，丢弃");
+                        continue;
+                    }
+
+                    byte msgType = body[0];
+                    byte[] pbBytes = new byte[body.Length - 1];
+                    Buffer.BlockCopy(body, 1, pbBytes, 0, pbBytes.Length);
+
+                    try
+                    {
+                        switch (msgType)
+                        {
+                            case 1: // 登录结果
+                                var login = S2C_LoginResult.Parser.ParseFrom(pbBytes);
+                                LocalEntityId = login.EntityId;
+                                Debug.Log($"<color=cyan>[S2C_LoginResult] entity={login.EntityId}, spawn=({login.SpawnPos.X},{login.SpawnPos.Y},{login.SpawnPos.Z}), msg={login.WelcomeMsg}</color>");
+                                OnLoginResultReceived?.Invoke(login);
+                                break;
+                            case 2: // 移动广播
+                                var moveMsg = S2C_MoveBroadcast.Parser.ParseFrom(pbBytes);
+                                Debug.Log($"<color=green>[S2C_MoveBroadcast] entity={moveMsg.EntityId}, pos=({moveMsg.Pos.X:F2},{moveMsg.Pos.Y:F2},{moveMsg.Pos.Z:F2}), rotY={moveMsg.RotY:F1}</color>");
+                                OnMoveBroadcastReceived?.Invoke(moveMsg);
+                                break;
+                            default:
+                                Debug.LogWarning($"[TCP] 未知消息类型: {msgType}");
+                                break;
+                        }
+                    }
+                    catch (Exception e)
+                    {
+                        Debug.LogWarning($"[TCP] 反序列化消息失败, type={msgType}, err={e.Message}");
+                    }
                 }
                 else
                 {
