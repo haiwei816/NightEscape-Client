@@ -11,6 +11,7 @@ public class NetworkEntityManager : MonoBehaviour
 
     // entityId -> Transform
     private readonly Dictionary<int, Transform> _entities = new Dictionary<int, Transform>();
+    private bool _bound;
 
     private void Awake()
     {
@@ -23,11 +24,17 @@ public class NetworkEntityManager : MonoBehaviour
             Destroy(gameObject);
             return;
         }
+    }
 
-        if (TcpClientManager.Instance != null)
-        {
-            TcpClientManager.Instance.OnMoveBroadcastReceived += OnMoveBroadcast;
-        }
+    private void OnEnable()
+    {
+        TryBind();
+    }
+
+    private void Start()
+    {
+        // 兜底：如果 TcpClientManager 稍后才初始化，这里再尝试一次
+        TryBind();
     }
 
     private void OnDestroy()
@@ -36,6 +43,14 @@ public class NetworkEntityManager : MonoBehaviour
         {
             TcpClientManager.Instance.OnMoveBroadcastReceived -= OnMoveBroadcast;
         }
+    }
+
+    private void TryBind()
+    {
+        if (_bound) return;
+        if (TcpClientManager.Instance == null) return;
+        TcpClientManager.Instance.OnMoveBroadcastReceived += OnMoveBroadcast;
+        _bound = true;
     }
 
     private void OnMoveBroadcast(S2C_MoveBroadcast msg)
