@@ -64,7 +64,9 @@
     <Compile Include="Assets\Core\PlayerController.cs" />
     <Compile Include="Assets\Protobuf\AllInOne.cs" />
     <Compile Include="Assets\Core\NetTester.cs" />
+    <Compile Include="Assets\Core\RoomManager.cs" />
     <Compile Include="Assets\Core\NetworkEntityManager.cs" />
+    <Compile Include="Assets\Core\RemotePlayer.cs" />
     <Compile Include="Assets\Core\ControllerWeight.cs" />
   </ItemGroup>
   <ItemGroup>
