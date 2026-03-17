@@ -10,10 +10,24 @@ public class TcpClientManager : MonoBehaviour
     // --- 第一部分：基础定义与单例 ---
     public static TcpClientManager Instance;
 
+    [Header("协议类型号 (msgType)")]
+    [Tooltip("S2C_LoginResult 的 msgType（当前代码里固定为 1）")]
+    [SerializeField] private byte _msgTypeLoginResult = 1;
+    [Tooltip("S2C_MoveBroadcast 的 msgType（当前代码里固定为 2）")]
+    [SerializeField] private byte _msgTypeMoveBroadcast = 2;
+    [Tooltip("S2C_MatchStatus 的 msgType（需与服务端保持一致）")]
+    [SerializeField] private byte _msgTypeMatchStatus = 3;
+    [Tooltip("S2C_GameStart 的 msgType（需与服务端保持一致）")]
+    [SerializeField] private byte _msgTypeGameStart = 4;
+
     // 服务器广播玩家移动时的回调
     public Action<S2C_MoveBroadcast> OnMoveBroadcastReceived;
     // 登录结果回调
     public Action<S2C_LoginResult> OnLoginResultReceived;
+    // 匹配人数/状态更新回调
+    public Action<S2C_MatchStatus> OnMatchStatusReceived;
+    // 游戏开始回调
+    public Action<S2C_GameStart> OnGameStartReceived;
 
     // 本机在服务器上的实体 ID
     public int LocalEntityId { get; private set; }
@@ -135,7 +149,7 @@ public class TcpClientManager : MonoBehaviour
                     {
                         switch (msgType)
                         {
-                            case 1: // 登录结果
+                            case var t when t == _msgTypeLoginResult: // 登录结果
                                 var login = S2C_LoginResult.Parser.ParseFrom(pbBytes);
                                 Debug.Log($"<color=cyan>[S2C_LoginResult] entity={login.EntityId}, spawn=({login.SpawnPos.X},{login.SpawnPos.Y},{login.SpawnPos.Z}), msg={login.WelcomeMsg}</color>");
                                 _mainThreadActions.Enqueue(() =>
@@ -144,12 +158,28 @@ public class TcpClientManager : MonoBehaviour
                                     OnLoginResultReceived?.Invoke(login);
                                 });
                                 break;
-                            case 2: // 移动广播
+                            case var t when t == _msgTypeMoveBroadcast: // 移动广播
                                 var moveMsg = S2C_MoveBroadcast.Parser.ParseFrom(pbBytes);
                                 Debug.Log($"<color=green>[S2C_MoveBroadcast] entity={moveMsg.EntityId}, pos=({moveMsg.Pos.X:F2},{moveMsg.Pos.Y:F2},{moveMsg.Pos.Z:F2}), rotY={moveMsg.RotY:F1}</color>");
                                 _mainThreadActions.Enqueue(() =>
                                 {
                                     OnMoveBroadcastReceived?.Invoke(moveMsg);
+                                });
+                                break;
+                            case var t when t == _msgTypeMatchStatus: // 匹配状态
+                                var match = S2C_MatchStatus.Parser.ParseFrom(pbBytes);
+                                Debug.Log($"<color=magenta>[S2C_MatchStatus] {match.CurrentPlayers}/{match.TotalRequired} msg={match.StatusMsg}</color>");
+                                _mainThreadActions.Enqueue(() =>
+                                {
+                                    OnMatchStatusReceived?.Invoke(match);
+                                });
+                                break;
+                            case var t when t == _msgTypeGameStart: // 游戏开始
+                                var start = S2C_GameStart.Parser.ParseFrom(pbBytes);
+                                Debug.Log($"<color=yellow>[S2C_GameStart] room={start.RoomId}, map={start.MapId}</color>");
+                                _mainThreadActions.Enqueue(() =>
+                                {
+                                    OnGameStartReceived?.Invoke(start);
                                 });
                                 break;
                             default:
@@ -196,5 +226,18 @@ public class TcpClientManager : MonoBehaviour
     public bool IsConnected
     {
         get { return _client != null && _client.Connected; }
+    }
+
+    /// <summary>
+    /// 发送一条带 msgType 头的 protobuf 消息（格式： [msgType(1)][pbBytes...] ）。
+    /// </summary>
+    public void SendTyped(byte msgType, Google.Protobuf.IMessage msg)
+    {
+        if (msg == null) return;
+        byte[] pb = Google.Protobuf.MessageExtensions.ToByteArray(msg);
+        byte[] body = new byte[1 + pb.Length];
+        body[0] = msgType;
+        Buffer.BlockCopy(pb, 0, body, 1, pb.Length);
+        Send(body);
     }
 }
